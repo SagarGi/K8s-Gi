@@ -1,0 +1,66 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: frontend-deployment
+  namespace: production
+
+spec:
+  replicas: 1 # Spreads across our worker nodes for high availability
+  selector:
+    matchLabels:
+      tier: frontend
+      app: web-ui
+  template:
+    metadata:
+      labels:
+        tier: frontend
+        app: web-ui
+    
+    spec:
+      containers:
+      - name: frontend-container
+        image: sagar4321/demo-web:latest
+        ports:
+        - containerPort: 8080
+          name: web-port
+        env:
+          # Mapping what the Node image expects to our existing ConfigMap/Secret names
+          - name: SERVER_URL
+            valueFrom:
+              configMapKeyRef:
+                name: app-config
+                key: SERVER_URL
+        # readinessProbe:
+        #   httpGet:
+        #     path: /
+        #     port: 80
+        #   initialDelaySeconds: 5
+        #   periodSeconds: 5
+        # livenessProbe:
+        #   httpGet:
+        #     path: /
+        #     port: 80
+        #   initialDelaySeconds: 15
+        #   periodSeconds: 10
+        resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+    
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: frontend-service
+  namespace: production
+spec:
+  ports:
+  - port: 8080
+    targetPort: 8080
+  selector:
+    tier: frontend
+    app: web-ui
+  type: ClusterIP

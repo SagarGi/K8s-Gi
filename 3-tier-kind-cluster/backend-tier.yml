@@ -1,0 +1,95 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-deployment
+  namespace: production
+
+spec:
+  replicas: 1 # High Availability: Spreading workloads across our 3 worker nodes
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1       # Spin up 1 new pod before killing an old one during updates
+      maxUnavailable: 0 # Ensure we never drop below 2 active pods during updates
+  selector:
+    matchLabels:
+      tier: backend
+      app: api-server
+  template:
+    metadata:
+      labels:
+        tier: backend
+        app: api-server
+    spec:
+      containers:
+        - name: api-container
+          image: sagar4321/demo-server:latest
+          ports:
+          - containerPort: 3001
+            name: api-port
+          env:
+          # Mapping what the Node image expects to our existing ConfigMap/Secret names
+          - name: DBHOST
+            valueFrom:
+              configMapKeyRef:
+                name: app-config
+                key: DB_HOST
+          - name: DBNAME
+            valueFrom:
+              configMapKeyRef:
+                name: app-config
+                key: DB_NAME
+          - name: DBUSER
+            valueFrom:
+              configMapKeyRef:
+                name: app-config
+                key: DB_USER
+          - name: DBPORT
+            valueFrom:
+              configMapKeyRef:
+                name: app-config
+                key: DB_PORT
+          - name: PORT
+            valueFrom:
+              configMapKeyRef:
+                name: app-config
+                key: SERVER_PORT
+          - name: DBPASSWORD
+            valueFrom:
+              secretKeyRef:
+                name: db-credentials
+                key: MYSQL_DB_PASSWORD
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "200m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          # readinessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: 3000
+          #   initialDelaySeconds: 5
+          #   periodSeconds: 10
+          # livenessProbe:
+          #   httpGet:
+          #     path: /health
+          #     port: 3000
+          #   initialDelaySeconds: 15
+          #   periodSeconds: 10
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-service
+  namespace: production
+spec:
+  ports:
+  - port: 3001
+    targetPort: 3001
+  selector:
+    tier: backend
+    app: api-server
+  type: ClusterIP # Internal cluster communication only
